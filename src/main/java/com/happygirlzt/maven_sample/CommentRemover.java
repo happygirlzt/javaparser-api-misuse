@@ -11,6 +11,11 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.comments.Comment;
 import com.github.javaparser.ast.Node;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
+
 import java.io.BufferedReader;
 
 import java.io.*;
@@ -161,10 +166,48 @@ public class CommentRemover {
         saveErrors(errorFiles, "/Users/happygirlzt/Downloads/error-files.txt");
     }
 
-    public static void matchMethods(String filePath, String fileName) throws IOException {
-        int dotIndex = fileName.lastIndexOf('.');
-        fileName = fileName.substring(0, dotIndex);
+    public static void matchAllMethods() throws Exception {
+        JSONArray data = null;
+        try {
+            JSONParser parser = new JSONParser();
+            //Use JSONObject for simple JSON and JSONArray for array of JSON.
+            data = (JSONArray) parser.parse(
+                    new FileReader("/Users/happygirlzt/Downloads/method_lines.json"));
+        } catch (IOException | ParseException e) {
+            e.printStackTrace();
+        }
 
+        assert data != null;
+        JSONArray methodList = new JSONArray();
+        for (Object dataObj :  ProgressBar.wrap(data, "get method name")) {
+            JSONObject item = (JSONObject) dataObj;
+            String buggy_commit_path = (String) item.get("buggy_commit");
+            String fixed_commit_path = (String) item.get("fixed_commit");
+            int buggy_line = Integer.parseInt((String) item.get("buggy_line"));
+            int fixed_line = Integer.parseInt((String) item.get("fixed_line"));
+            String buggy_method_name = matchMethod(ORIGINAL_PATH + buggy_commit_path, buggy_line);
+            String fixed_method_name = matchMethod(ORIGINAL_PATH + fixed_commit_path, fixed_line);
+
+            JSONObject methodInfo = new JSONObject();
+            methodInfo.put("buggy_commit", buggy_commit_path);
+            methodInfo.put("buggy_line", buggy_line);
+            methodInfo.put("buggy_method", buggy_method_name);
+            methodInfo.put("fixed_commit", fixed_commit_path);
+            methodInfo.put("fixed_line", fixed_line);
+            methodInfo.put("fixed_method", fixed_method_name);
+            methodList.add(methodInfo);
+        }
+        try (FileWriter file = new FileWriter("/Users/happygirlzt/Downloads/method-pairs-line.json")) {
+            //We can write any JSONArray or JSONObject instance to the file
+            file.write(methodList.toJSONString());
+            file.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static String matchMethod(String filePath, int line) throws IOException {
+        String methodName = "";
         try {
             CompilationUnit cu = StaticJavaParser.parse(new File(filePath));
             List<MethodDeclaration> mds = cu.findAll(MethodDeclaration.class);
@@ -180,16 +223,22 @@ public class CommentRemover {
                     endLineNum = endLine.get().line;
                 };
 
+                if (line >= beginLineNum && line <= endLineNum) {
+                    methodName = String.valueOf(md.getName());
+                    break;
+                }
 //                WriteToFile(cur, METHOD_PATH + fileName + "_" + methodName + ".java");
             }
         } catch(Exception e) {
-            System.out.println(fileName);
+            return methodName;
         }
+        return methodName;
     }
 
     public static void main(String[] args) throws Exception {
-        handleAllFiles();
+//        handleAllFiles();
 //        handleErrors("/Users/happygirlzt/Downloads/error-files.txt");
+          matchAllMethods();
 //        matchMethods("/Users/happygirlzt/Downloads/raw-files/zzzlift/Algorithm/buggy/88e2a7569a31caeb89d0b53eda3b1ed5c8f28e86/Graph_AdjList_int2_dfs.java",
 //                "Graph_AdjList_int2_dfs.java");
     }
