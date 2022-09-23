@@ -16,22 +16,17 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-import java.io.BufferedReader;
-
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class CommentRemover {
     private static final String ORIGINAL_PATH = "/Users/happygirlzt/Downloads/raw-files/";
-    private static final String NO_COMMENT_PATH = "/Users/happygirlzt/Downloads/no-comment-javas/";
-    private static final String METHOD_PATH = "/Users/happygirlzt/Downloads/Spring-DATAMONGO-methods-java-1/";
-
-//    public static Set<String> tooLong = new HashSet<>();
-
-    // private static final String ORIGINAL_PATH = "/Users/happygirlzt/Downloads/ErrorFileInvestigation/";
-    // private static final String NO_COMMENT_PATH = "/Users/happygirlzt/Downloads/no-comment-error-files/";
+    private static final String NO_COMMENT_PATH = "/Users/happygirlzt/Downloads/no-comment-files/";
+    private static final String METHOD_PATH = "/Users/happygirlzt/Downloads/method-pairs/";
+    private static final String HOME_PATH = "/Users/happygirlzt/Downloads/";
 
     static void RecursiveFindFiles(File[] arr, Set<File> files) {
         // for-each loop for main directory files
@@ -40,13 +35,13 @@ public class CommentRemover {
                files.add(f);
             } else if (f.isDirectory()) {
                 // recursion for sub-directories
-                RecursiveFindFiles(f.listFiles(), files);
+                RecursiveFindFiles(Objects.requireNonNull(f.listFiles()), files);
             }
         }
     }
 
     public static Set<String> listFiles(String dir) {
-        return Stream.of(new File(dir).listFiles())
+        return Stream.of(Objects.requireNonNull(new File(dir).listFiles()))
                 .filter(file -> !file.isDirectory())
                 .map(File::getName)
                 .collect(Collectors.toSet());
@@ -60,7 +55,7 @@ public class CommentRemover {
         File f = new File(outName);
         String parent = f.getParent();
         File parentDirectory = new File(parent);
-        if (! parentDirectory.exists()) {
+        if (!parentDirectory.exists()) {
             parentDirectory.mkdirs();
         }
         // handle long file name
@@ -76,26 +71,66 @@ public class CommentRemover {
         outputStream.close();
     }
 
-    public static void extractMethods(String filePath, String fileName) throws IOException {
-        int dotIndex = fileName.lastIndexOf('.');
-        fileName = fileName.substring(0, dotIndex);
+    public static void extractMethodByName(String filePath, String fileName, String targetMethodName,
+                                           List<String> parsedErrors)
+            throws IOException {
+        fileName = fileName.split("\\.")[0];
+        System.out.println(filePath);
 
         try {
             CompilationUnit cu = StaticJavaParser.parse(new File(filePath));
             List<MethodDeclaration> mds = cu.findAll(MethodDeclaration.class);
             for (MethodDeclaration md : mds) {
                 String methodName = md.getNameAsString();
+                if (!methodName.equals(targetMethodName)) {
+                    continue;
+                }
                 String cur = md.toString();
                 WriteToFile(cur, METHOD_PATH + fileName + "_" + methodName + ".java");
             }
         } catch(Exception e) {
-            System.out.println(fileName);
+            parsedErrors.add(filePath);
         }
     }
 
-    public static void saveErrors(Set<String> obj, String path) throws Exception {
+    public static void extractAllMethodsByName() throws Exception {
+        JSONArray data = null;
+        try {
+            JSONParser parser = new JSONParser();
+            //Use JSONObject for simple JSON and JSONArray for array of JSON.
+            data = (JSONArray) parser.parse(
+                    new FileReader("/Users/happygirlzt/Downloads/method-pairs-line.json"));
+        } catch (IOException | ParseException e) {
+            e.printStackTrace();
+        }
+
+        assert data != null;
+        List<String> parsedErrors = new ArrayList<>();
+        for (Object dataObj : ProgressBar.wrap(data, "extract method with name")) {
+            JSONObject item = (JSONObject) dataObj;
+            String buggy_commit_path = (String) item.get("buggy_commit");
+            String fixed_commit_path = (String) item.get("fixed_commit");
+
+            String buggy_method_name = (String) item.get("buggy_method");
+            String fixed_method_name = (String) item.get("fixed_method");
+
+            String java_file_path = NO_COMMENT_PATH + buggy_commit_path;
+            String[] paths = java_file_path.split("/");
+            String fileName = paths[paths.length - 1];
+            extractMethodByName(NO_COMMENT_PATH + buggy_commit_path, fileName, buggy_method_name, parsedErrors);
+
+            java_file_path = NO_COMMENT_PATH + fixed_commit_path;
+            paths = java_file_path.split("/");
+            fileName = paths[paths.length - 1];
+            extractMethodByName(NO_COMMENT_PATH + fixed_commit_path, fileName, fixed_method_name, parsedErrors);
+            break;
+        }
+        saveErrors(parsedErrors, HOME_PATH + "parsed_errors.txt");
+    }
+
+    public static void saveErrors(List<String> obj, String path) throws Exception {
         try (PrintWriter pw = new PrintWriter(
-                new OutputStreamWriter(new FileOutputStream(path), "UTF-8"))) {
+                new OutputStreamWriter(new FileOutputStream(path), StandardCharsets.UTF_8))) {
             for (String s : obj) {
                 pw.println(s);
             }
@@ -120,13 +155,14 @@ public class CommentRemover {
         }
     }
 
-    public static void handleAllFiles() throws Exception {
+    public static void removeCommentAllFiles() throws Exception {
+        // Remove comments
         List<File> directories = Arrays.asList(listDirectories(ORIGINAL_PATH));
         int errors = 0;
-        Set<String> errorFiles = new HashSet<>();
+        List<String> errorFiles = new ArrayList<>();
         int totalFiles = 0;
 
-        for (File directory : ProgressBar.wrap(directories, "check directory")) {
+        for (File directory : ProgressBar.wrap(directories, "remove comments")) {
             File[] tmpDirectory = new File[1];
             tmpDirectory[0] = directory;
             Set<File> files = new HashSet<>();
@@ -163,10 +199,12 @@ public class CommentRemover {
         }
 
         System.out.println("Total files are " + totalFiles);
+        System.out.println("Parse errors " + errors);
         saveErrors(errorFiles, "/Users/happygirlzt/Downloads/error-files.txt");
     }
 
     public static void matchAllMethods() throws Exception {
+        // For each method, we find the method name which covers the line
         JSONArray data = null;
         try {
             JSONParser parser = new JSONParser();
@@ -197,6 +235,7 @@ public class CommentRemover {
             methodInfo.put("fixed_method", fixed_method_name);
             methodList.add(methodInfo);
         }
+
         try (FileWriter file = new FileWriter("/Users/happygirlzt/Downloads/method-pairs-line.json")) {
             //We can write any JSONArray or JSONObject instance to the file
             file.write(methodList.toJSONString());
@@ -207,6 +246,7 @@ public class CommentRemover {
     }
 
     public static String matchMethod(String filePath, int line) throws IOException {
+        // find the method which covers the line
         String methodName = "";
         try {
             CompilationUnit cu = StaticJavaParser.parse(new File(filePath));
@@ -236,61 +276,9 @@ public class CommentRemover {
     }
 
     public static void main(String[] args) throws Exception {
-//        handleAllFiles();
+//        removeCommentAllFiles();
 //        handleErrors("/Users/happygirlzt/Downloads/error-files.txt");
-          matchAllMethods();
-//        matchMethods("/Users/happygirlzt/Downloads/raw-files/zzzlift/Algorithm/buggy/88e2a7569a31caeb89d0b53eda3b1ed5c8f28e86/Graph_AdjList_int2_dfs.java",
-//                "Graph_AdjList_int2_dfs.java");
+        extractAllMethodsByName();
+//          matchAllMethods();
     }
-//        for (File dire : directories) {
-//            System.out.println(String.valueOf(dire));
-//            Set<String> javaFiles = listFiles(String.valueOf(dire));
-//            System.out.println(javaFiles.size());
-//
-//            for (String javaFile : javaFiles) {
-//                String inputFileName = ORIGINAL_PATH + javaFile;
-//                String outputFileName = NO_COMMENT_PATH + javaFile;
-//
-//    //            extractMethods(inputFileName, javaFile);
-//
-//                CompilationUnit cu = null;
-//                try {
-//                     cu = StaticJavaParser.parse(new File(inputFileName));
-//                } catch (Exception e) {
-//                    errors += 1;
-//                    if (errors % 50 == 0) {
-//                        System.out.println("failed " + errors);
-//                    }
-//                    errorFiles.add(javaFile);
-//                    continue;
-//                }
-//
-//                List<Comment> comments = cu.getAllContainedComments();
-//
-//                List<Comment> unwantedComments = comments
-//                 .stream()
-//                 .filter(p -> p.isLineComment() || p.isBlockComment())
-//                 .filter(p -> !p.getCommentedNode().isPresent() || p.isLineComment() || p.isBlockComment())
-//                 .collect(Collectors.toList());
-//                unwantedComments.forEach(Node::remove);
-//
-//                 comments.forEach(Node::remove);
-//
-//                 WriteToFile(cu.toString(), outputFileName);
-//            }
-//        }
-//
-//        File directory = new File(NO_COMMENT_PATH);
-//        if (! directory.exists()) {
-//            directory.mkdir();
-//            System.out.println("create no comment javas folder");
-//        }
-//
-//        File methDirectory = new File(METHOD_PATH);
-//        if (! methDirectory.exists()) {
-//            methDirectory.mkdir();
-//            System.out.println("create method javas folder");
-//        }
-//
-//        saveErrors(tooLong, "/Users/happygirlzt/Downloads/tooLong-Spring-DATAMONGO.txt");
 }
