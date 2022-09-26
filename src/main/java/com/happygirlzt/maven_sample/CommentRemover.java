@@ -16,6 +16,7 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
+import javax.sound.midi.SysexMessage;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -72,11 +73,9 @@ public class CommentRemover {
     }
 
     public static void extractMethodByName(String filePath, String fileName, String targetMethodName,
-                                           List<String> parsedErrors)
+                                           List<String> parsedErrors, String variant, int index)
             throws IOException {
         fileName = fileName.split("\\.")[0];
-        System.out.println(filePath);
-
         try {
             CompilationUnit cu = StaticJavaParser.parse(new File(filePath));
             List<MethodDeclaration> mds = cu.findAll(MethodDeclaration.class);
@@ -86,7 +85,8 @@ public class CommentRemover {
                     continue;
                 }
                 String cur = md.toString();
-                WriteToFile(cur, METHOD_PATH + fileName + "_" + methodName + ".java");
+                WriteToFile(cur, METHOD_PATH + index + "_" + fileName + "_"
+                        + methodName + "_" + variant + ".java");
             }
         } catch(Exception e) {
             parsedErrors.add(filePath);
@@ -106,6 +106,7 @@ public class CommentRemover {
 
         assert data != null;
         List<String> parsedErrors = new ArrayList<>();
+        int index = 0;
         for (Object dataObj : ProgressBar.wrap(data, "extract method with name")) {
             JSONObject item = (JSONObject) dataObj;
             String buggy_commit_path = (String) item.get("buggy_commit");
@@ -117,14 +118,17 @@ public class CommentRemover {
             String java_file_path = NO_COMMENT_PATH + buggy_commit_path;
             String[] paths = java_file_path.split("/");
             String fileName = paths[paths.length - 1];
-            extractMethodByName(NO_COMMENT_PATH + buggy_commit_path, fileName, buggy_method_name, parsedErrors);
+            extractMethodByName(NO_COMMENT_PATH + buggy_commit_path, fileName,
+                    buggy_method_name, parsedErrors, "buggy", index);
 
             java_file_path = NO_COMMENT_PATH + fixed_commit_path;
             paths = java_file_path.split("/");
             fileName = paths[paths.length - 1];
-            extractMethodByName(NO_COMMENT_PATH + fixed_commit_path, fileName, fixed_method_name, parsedErrors);
-            break;
+            extractMethodByName(NO_COMMENT_PATH + fixed_commit_path, fileName,
+                    fixed_method_name, parsedErrors, "fixed", index);
+            index += 1;
         }
+        System.out.println("Parsed errors " + parsedErrors.size());
         saveErrors(parsedErrors, HOME_PATH + "parsed_errors.txt");
     }
 
