@@ -16,7 +16,6 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-import javax.sound.midi.SysexMessage;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -41,13 +40,6 @@ public class CommentRemover {
         }
     }
 
-    public static Set<String> listFiles(String dir) {
-        return Stream.of(Objects.requireNonNull(new File(dir).listFiles()))
-                .filter(file -> !file.isDirectory())
-                .map(File::getName)
-                .collect(Collectors.toSet());
-    }
-
     public static File[] listDirectories(String dir) {
         return new File(dir).listFiles(File::isDirectory);
     }
@@ -59,12 +51,6 @@ public class CommentRemover {
         if (!parentDirectory.exists()) {
             parentDirectory.mkdirs();
         }
-        // handle long file name
-//        if (filename.length() > 255) {
-//            tooLong.add(filename);
-//            int slashIndex = outName.lastIndexOf('/');
-//            outName = outName.substring(0, slashIndex) + filename.substring(255);
-//        }
 
         FileOutputStream outputStream = new FileOutputStream(outName);
         byte[] strToBytes = toWrite.getBytes();
@@ -204,7 +190,7 @@ public class CommentRemover {
 
         System.out.println("Total files are " + totalFiles);
         System.out.println("Parse errors " + errors);
-        saveErrors(errorFiles, "/Users/happygirlzt/Downloads/error-files.txt");
+        saveErrors(errorFiles, "/Users/happygirlzt/Downloads/new-error-files.txt");
     }
 
     public static void matchAllMethods() throws Exception {
@@ -212,7 +198,6 @@ public class CommentRemover {
         JSONArray data = null;
         try {
             JSONParser parser = new JSONParser();
-            //Use JSONObject for simple JSON and JSONArray for array of JSON.
             data = (JSONArray) parser.parse(
                     new FileReader("/Users/happygirlzt/Downloads/method_lines.json"));
         } catch (IOException | ParseException e) {
@@ -260,12 +245,12 @@ public class CommentRemover {
                 Optional<Position> beginLine = md.getBegin();
                 if (beginLine.isPresent()) {
                     beginLineNum = beginLine.get().line;
-                };
+                }
 
                 Optional<Position> endLine = md.getEnd();
                 if (endLine.isPresent()) {
                     endLineNum = endLine.get().line;
-                };
+                }
 
                 if (line >= beginLineNum && line <= endLineNum) {
                     methodName = String.valueOf(md.getName());
@@ -281,8 +266,8 @@ public class CommentRemover {
 
     public static void main(String[] args) throws Exception {
 //        removeCommentAllFiles();
-//        handleErrors("/Users/happygirlzt/Downloads/error-files.txt");
+//        extractAllMethodsByName();
+          matchAllMethods();
         extractAllMethodsByName();
-//          matchAllMethods();
     }
 }
