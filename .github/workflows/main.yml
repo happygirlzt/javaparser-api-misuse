@@ -1,4 +1,4 @@
-name: Issues Similarity Analysis
+name: Duplicate Issue Searcher
 
 on:
   issues:
@@ -9,9 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: analysis
-        uses: happygirlzt/issues-similarity-analysis@5031b74d6097ba8b1b3127583e160cb98abfe0b3
+        uses: happygirlzt/duplicate-issue-searcher@6775df1fa50b395c2387e71f2c78d1e39ffe699a
         with:
           filter-threshold: 0.5
           title-excludes: 'bug, not, 1234'
-          comment-title: '### See'
+          comment-title: '### Potential duplicates'
           comment-body: '${index}. ${similarity} #${number}'
