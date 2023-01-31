@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: analysis
-        uses: actions-cool/issues-similarity-analysis@v1
+        uses: happygirlzt/issues-similarity-analysis@5031b74d6097ba8b1b3127583e160cb98abfe0b3
         with:
           filter-threshold: 0.5
           title-excludes: 'bug, not, 1234'
