@@ -1,0 +1,2 @@
+- name: Issues Similarity Analysis
+  uses: actions-cool/issues-similarity-analysis@v1.2.3
