@@ -9,9 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: analysis
-        uses: happygirlzt/duplicate-issue-searcher@3ad7cc09eee156ea191e80a2b12b958cf54ddf0f
+        uses: happygirlzt/duplicate-issue-searcher@6775df1fa50b395c2387e71f2c78d1e39ffe699a
         with:
           filter-threshold: 0.5
-          title-excludes: 'bug, not, 1234'
           comment-title: '### Potential duplicates'
           comment-body: '${index}. ${similarity} #${number}'
