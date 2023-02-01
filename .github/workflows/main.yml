@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: analysis
-        uses: happygirlzt/duplicate-issue-searcher@3f7795c2a6047fb5805bc1b2aeec3b096ce1f720
+        uses: happygirlzt/duplicate-issue-searcher@c39f4252797222d4456d464aa48539681d5138fc
         with:
           filter-threshold: 0.5
           title-excludes: 'bug, not, 1234'
